@@ -1,6 +1,4 @@
-from . import RestaurantPizza
-from app import db
-
+from models import db
 class Pizza(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
