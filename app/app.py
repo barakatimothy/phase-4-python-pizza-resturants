@@ -1,6 +1,8 @@
-from flask import Flask,jsonify
-from models.restaurant import Restaurant
+from flask import Flask, jsonify, request, abort
 from flask_sqlalchemy import SQLAlchemy
+from models.restaurant import Restaurant
+from models.pizza import Pizza
+from models.restaurant_pizza import RestaurantPizza
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'  
@@ -39,6 +41,61 @@ def get_restaurant_by_id(id):
         return jsonify(restaurant_data), 200
     else:
         return jsonify({"error": "Restaurant not found"}), 404
+    
+@app.route('/restaurants/<int:id>', methods=['DELETE'])
+def delete_restaurant(id):
+    restaurant = Restaurant.query.get(id)
+    if restaurant:
+        # Delete associated RestaurantPizza entries first
+        for restaurant_pizza in restaurant.restaurant_pizzas:
+            db.session.delete(restaurant_pizza)
+        db.session.delete(restaurant)
+        db.session.commit()
+        return '', 204
+    else:
+        return jsonify({"error": "Restaurant not found"}), 404
+
+@app.route('/pizzas', methods=['GET'])
+def get_pizzas():
+    pizzas = Pizza.query.all()
+    pizzas_list = []
+    for pizza in pizzas:
+        pizzas_list.append({
+            "id": pizza.id,
+            "name": pizza.name,
+            "ingredients": pizza.ingredients
+        })
+    return jsonify(pizzas_list), 200
+
+@app.route('/restaurant_pizzas', methods=['POST'])
+def create_restaurant_pizza():
+    data = request.get_json()
+    price = data.get('price')
+    pizza_id = data.get('pizza_id')
+    restaurant_id = data.get('restaurant_id')
+
+    # Check if pizza and restaurant exist
+    pizza = Pizza.query.get(pizza_id)
+    restaurant = Restaurant.query.get(restaurant_id)
+
+    if not pizza or not restaurant:
+        return jsonify({"error": "Pizza or Restaurant not found"}), 404
+
+    # Create a new RestaurantPizza
+    new_restaurant_pizza = RestaurantPizza(price=price, pizza_id=pizza_id, restaurant_id=restaurant_id)
+
+    try:
+        db.session.add(new_restaurant_pizza)
+        db.session.commit()
+        response_data = {
+            "id": pizza.id,
+            "name": pizza.name,
+            "ingredients": pizza.ingredients
+        }
+        return jsonify(response_data), 201
+    except:
+        db.session.rollback()
+        return jsonify({"errors": ["validation errors"]}), 400
 
 
 
